@@ -86,7 +86,7 @@
 				>
 					◐
 				</button>
-				<form method="POST" action="/auth/logout">
+				<form method="POST" action="/logout">
 					<button type="submit" class="text-xs text-muted-foreground hover:text-foreground">
 						Sign out
 					</button>
