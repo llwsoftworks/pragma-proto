@@ -81,10 +81,7 @@
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <div
-	class="relative rounded-lg border-2 border-dashed p-8 text-center transition-colors"
-	class:border-primary={dragging}
-	class:border-border={!dragging}
-	class:bg-primary/5={dragging}
+	class="relative rounded-lg border-2 border-dashed p-8 text-center transition-colors {dragging ? 'border-primary bg-primary/5' : 'border-border'}"
 	role="button"
 	tabindex="0"
 	aria-label="Drop files here or click to browse"
