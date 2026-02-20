@@ -2,15 +2,18 @@ package database
 
 import (
 	"context"
+	"embed"
 	"fmt"
-	"os"
-	"path/filepath"
+	"io/fs"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
 
 // DB wraps a pgxpool connection pool.
 type DB struct {
@@ -52,9 +55,9 @@ func (db *DB) Healthy(ctx context.Context) error {
 	return db.Pool.Ping(ctx)
 }
 
-// RunMigrations applies all .sql migration files in the given directory in order.
+// RunMigrations applies all .sql migration files embedded at compile time in order.
 // It creates a simple schema_migrations tracking table to avoid re-running.
-func (db *DB) RunMigrations(ctx context.Context, migrationsDir string) error {
+func (db *DB) RunMigrations(ctx context.Context) error {
 	// Ensure migrations tracking table exists.
 	_, err := db.Pool.Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -81,10 +84,10 @@ func (db *DB) RunMigrations(ctx context.Context, migrationsDir string) error {
 	}
 	rows.Close()
 
-	// Find migration files.
-	entries, err := os.ReadDir(migrationsDir)
+	// Find migration files from embedded FS.
+	entries, err := fs.ReadDir(migrationsFS, "migrations")
 	if err != nil {
-		return fmt.Errorf("database: read migrations dir: %w", err)
+		return fmt.Errorf("database: read migrations: %w", err)
 	}
 
 	var files []string
@@ -101,7 +104,7 @@ func (db *DB) RunMigrations(ctx context.Context, migrationsDir string) error {
 			continue
 		}
 
-		content, err := os.ReadFile(filepath.Join(migrationsDir, file))
+		content, err := migrationsFS.ReadFile("migrations/" + file)
 		if err != nil {
 			return fmt.Errorf("database: read migration %s: %w", file, err)
 		}
