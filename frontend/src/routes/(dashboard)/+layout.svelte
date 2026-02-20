@@ -4,7 +4,6 @@
 	import { currentUser } from '$lib/stores/auth';
 	import { theme } from '$lib/stores/theme';
 	import { notifications } from '$lib/stores/notifications';
-	import '../../app.css';
 
 	export let data: LayoutData;
 
