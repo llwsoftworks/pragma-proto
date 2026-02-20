@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
@@ -38,9 +37,8 @@ func main() {
 	}
 	defer db.Close()
 
-	// Run migrations.
-	migrationsDir := filepath.Join("internal", "database", "migrations")
-	if err := db.RunMigrations(context.Background(), migrationsDir); err != nil {
+	// Run migrations (SQL files are embedded in the binary at compile time).
+	if err := db.RunMigrations(context.Background()); err != nil {
 		log.Fatalf("migrations: %v", err)
 	}
 
