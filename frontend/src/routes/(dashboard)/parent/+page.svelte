@@ -11,7 +11,10 @@
 	export let data: PageData;
 
 	$: children = data.dashboard.children ?? [];
-	let selectedChildId = children[0]?.student_id ?? '';
+	// Use data.dashboard directly so this is safe during SSR before the reactive
+	// `children` declaration has been evaluated (accessing `children[0]` when
+	// `children` is still undefined would throw a TypeError and cause a 500).
+	let selectedChildId = data.dashboard.children?.[0]?.student_id ?? '';
 
 	$: selectedChild = children.find((c) => c.student_id === selectedChildId);
 </script>

@@ -1,21 +1,14 @@
 import type { PageServerLoad } from './$types';
+import { students } from '$lib/api';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const API_BASE = process.env.API_URL ?? 'http://localhost:8080';
 
-	// Fetch the student's own digital ID.
 	try {
-		// We need the student's record ID first.
-		const studentRes = await fetch(`${API_BASE}/students/me`, {
-			headers: { Authorization: `Bearer ${locals.sessionToken}` }
-		});
-		if (!studentRes.ok) {
-			return { digitalId: null, error: 'Could not load student data' };
-		}
-		const student = await studentRes.json();
-		const studentId = student.id;
+		// Resolve the student's DB id from the JWT user_id via /students/me.
+		const student = await students.me(locals.sessionToken!);
 
-		const idRes = await fetch(`${API_BASE}/students/${studentId}/digital-id`, {
+		const idRes = await fetch(`${API_BASE}/students/${student.id}/digital-id`, {
 			headers: { Authorization: `Bearer ${locals.sessionToken}` }
 		});
 
@@ -26,6 +19,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 		const digitalId = await idRes.json();
 		return { digitalId, error: null };
 	} catch {
-		return { digitalId: null, error: 'Failed to load digital ID' };
+		return { digitalId: null, error: 'Could not load student data.' };
 	}
 };

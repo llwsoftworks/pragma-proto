@@ -208,7 +208,14 @@ export interface Attachment {
 	created_at: string;
 }
 
+export interface AssignmentListItem extends Assignment {
+	course_name: string;
+}
+
 export const assignments = {
+	list: (token: string) =>
+		apiFetch<{ assignments: AssignmentListItem[] }>('/assignments', { token }),
+
 	create: (data: CreateAssignmentData, token: string) =>
 		apiFetch<{ assignment_id: string }>('/assignments', {
 			method: 'POST',
@@ -342,6 +349,21 @@ export interface ReportCommentRequest {
 	grade_summary: string;
 	trend_direction: 'improving' | 'declining' | 'stable';
 }
+
+// ---- Students ----
+
+export interface MyStudentRecord {
+	id: string;
+	student_number: string;
+	grade_level: string;
+	enrollment_status: string;
+	is_grade_locked: boolean;
+	enrollment_date: string;
+}
+
+export const students = {
+	me: (token: string) => apiFetch<MyStudentRecord>('/students/me', { token })
+};
 
 // ---- Shared types ----
 

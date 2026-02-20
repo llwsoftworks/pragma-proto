@@ -25,6 +25,79 @@ func NewAssignmentsHandler(db *pgxpool.Pool, storage *services.StorageService) *
 	return &AssignmentsHandler{db: db, storage: storage}
 }
 
+// ListAssignments returns assignments for the teacher's courses (or all for admin).
+func (h *AssignmentsHandler) ListAssignments(w http.ResponseWriter, r *http.Request) {
+	claims, _ := auth.ClaimsFromContext(r.Context())
+	ctx := r.Context()
+
+	type assignmentRow struct {
+		ID          uuid.UUID  `json:"id"`
+		CourseID    uuid.UUID  `json:"course_id"`
+		CourseName  string     `json:"course_name"`
+		Title       string     `json:"title"`
+		Description *string    `json:"description,omitempty"`
+		DueDate     *time.Time `json:"due_date,omitempty"`
+		MaxPoints   float64    `json:"max_points"`
+		Category    string     `json:"category"`
+		Weight      float64    `json:"weight"`
+		IsPublished bool       `json:"is_published"`
+		CreatedAt   time.Time  `json:"created_at"`
+		UpdatedAt   time.Time  `json:"updated_at"`
+	}
+
+	// Build query; teachers see only their own courses, admins see all.
+	var (
+		query string
+		args  []interface{}
+	)
+	if claims.Role == models.RoleTeacher {
+		query = `
+			SELECT a.id, a.course_id, c.name,
+			       a.title, a.description, a.due_date, a.max_points,
+			       a.category, a.weight, a.is_published, a.created_at, a.updated_at
+			FROM assignments a
+			JOIN courses c ON c.id = a.course_id
+			JOIN teachers t ON t.id = c.teacher_id
+			WHERE t.user_id = $1 AND a.school_id = $2
+			ORDER BY a.due_date DESC NULLS LAST, a.created_at DESC`
+		args = []interface{}{claims.UserID, claims.SchoolID}
+	} else {
+		query = `
+			SELECT a.id, a.course_id, c.name,
+			       a.title, a.description, a.due_date, a.max_points,
+			       a.category, a.weight, a.is_published, a.created_at, a.updated_at
+			FROM assignments a
+			JOIN courses c ON c.id = a.course_id
+			WHERE a.school_id = $1
+			ORDER BY a.due_date DESC NULLS LAST, a.created_at DESC`
+		args = []interface{}{claims.SchoolID}
+	}
+
+	rows, err := h.db.Query(ctx, query, args...)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "db_error", err.Error())
+		return
+	}
+	defer rows.Close()
+
+	var assignments []assignmentRow
+	for rows.Next() {
+		var a assignmentRow
+		if err := rows.Scan(
+			&a.ID, &a.CourseID, &a.CourseName,
+			&a.Title, &a.Description, &a.DueDate,
+			&a.MaxPoints, &a.Category, &a.Weight,
+			&a.IsPublished, &a.CreatedAt, &a.UpdatedAt,
+		); err != nil {
+			writeError(w, http.StatusInternalServerError, "scan_error", err.Error())
+			return
+		}
+		assignments = append(assignments, a)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{"assignments": assignments})
+}
+
 // CreateAssignment creates a new assignment in a course.
 func (h *AssignmentsHandler) CreateAssignment(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.ClaimsFromContext(r.Context())
