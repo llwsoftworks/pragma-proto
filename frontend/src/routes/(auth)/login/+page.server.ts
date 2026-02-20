@@ -2,12 +2,13 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { auth } from '$lib/api';
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
 	// Redirect already-authenticated users to their dashboard.
 	if (locals.user?.mfaDone) {
 		const role = locals.user.role;
 		throw redirect(302, `/${role}`);
 	}
+	return { registered: url.searchParams.has('registered') };
 };
 
 export const actions: Actions = {

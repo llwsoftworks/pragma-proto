@@ -17,7 +17,16 @@
 		<div class="text-center">
 			<h1 class="text-2xl font-bold tracking-tight">Welcome back</h1>
 			<p class="mt-1 text-sm text-muted-foreground">Sign in to your account</p>
+			<p class="mt-1 text-sm text-muted-foreground">
+				No account? <a href="/register" class="text-primary hover:underline">Create one</a>
+			</p>
 		</div>
+
+		{#if data.registered}
+			<div class="rounded-md bg-green-500/10 px-4 py-3 text-sm text-green-700 dark:text-green-400" role="status">
+				Account created — please sign in.
+			</div>
+		{/if}
 
 		{#if form?.error}
 			<div class="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
