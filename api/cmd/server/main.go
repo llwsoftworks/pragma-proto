@@ -82,6 +82,7 @@ func main() {
 	scheduleH := handlers.NewScheduleHandler(db.Pool)
 	reportsH := handlers.NewReportsHandler(db.Pool, pdfSvc, storageSvc, gradingSvc)
 	coursesH := handlers.NewCoursesHandler(db.Pool)
+	studentsH := handlers.NewStudentsHandler(db.Pool)
 
 	// Build router.
 	r := chi.NewRouter()
@@ -146,8 +147,12 @@ func main() {
 		// Assignments.
 		r.Route("/assignments", func(r chi.Router) {
 			r.Use(apimiddleware.RequireRoles("teacher", "admin", "super_admin"))
+			r.Get("/", assignmentsH.ListAssignments)
 			r.Post("/", assignmentsH.CreateAssignment)
 		})
+
+		// Students self-service (any authenticated student can look up their own record).
+		r.Get("/students/me", studentsH.GetMyRecord)
 		r.Route("/assignments/{assignmentId}/attachments", func(r chi.Router) {
 			r.Get("/", assignmentsH.ListAttachments)
 			r.With(apimiddleware.RequireRoles("teacher", "admin", "super_admin")).
