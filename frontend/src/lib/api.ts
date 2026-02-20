@@ -21,8 +21,23 @@ interface FetchOptions extends RequestInit {
 	token?: string; // JWT for the Authorization header
 }
 
-/** Core fetch wrapper: forwards auth cookie, checks for errors. */
+/** Core fetch wrapper: forwards auth token, checks for errors. */
 async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T> {
+	const { data } = await apiFetchRaw<T>(path, options);
+	return data;
+}
+
+/**
+ * Like apiFetch but also returns the raw Set-Cookie header value.
+ * Used for auth endpoints (login, MFA verify) so +page.server.ts can
+ * forward the session cookie to the browser via SvelteKit's cookies API.
+ * Without this, the Go API's Set-Cookie is silently discarded by the
+ * server-side fetch and the browser never receives the session token.
+ */
+async function apiFetchRaw<T>(
+	path: string,
+	options: FetchOptions = {}
+): Promise<{ data: T; setCookie: string | null }> {
 	const { token, ...init } = options;
 
 	const headers = new Headers(init.headers);
@@ -31,11 +46,7 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T>
 		headers.set('Authorization', `Bearer ${token}`);
 	}
 
-	const response = await fetch(`${API_BASE}${path}`, {
-		...init,
-		headers,
-		credentials: 'include'
-	});
+	const response = await fetch(`${API_BASE}${path}`, { ...init, headers });
 
 	if (!response.ok) {
 		let body: { error?: string; message?: string } = {};
@@ -47,12 +58,14 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T>
 		throw new APIError(response.status, body.error ?? 'unknown_error', body.message ?? response.statusText);
 	}
 
-	// 204 No Content.
+	const setCookie = response.headers.get('set-cookie');
+
 	if (response.status === 204) {
-		return undefined as T;
+		return { data: undefined as T, setCookie };
 	}
 
-	return response.json() as Promise<T>;
+	const data = (await response.json()) as T;
+	return { data, setCookie };
 }
 
 // ---- Auth ----
@@ -73,14 +86,16 @@ export interface User {
 }
 
 export const auth = {
+	// Returns setCookie so +page.server.ts can forward it to the browser.
 	login: (email: string, password: string) =>
-		apiFetch<LoginResponse>('/auth/login', {
+		apiFetchRaw<LoginResponse>('/auth/login', {
 			method: 'POST',
 			body: JSON.stringify({ email, password })
 		}),
 
+	// Returns setCookie for the upgraded MFA-complete session token.
 	verifyMFA: (code: string, token: string) =>
-		apiFetch<{ ok: boolean }>('/auth/mfa/verify', {
+		apiFetchRaw<{ ok: boolean }>('/auth/mfa/verify', {
 			method: 'POST',
 			body: JSON.stringify({ code }),
 			token

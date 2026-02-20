@@ -22,11 +22,29 @@ export const actions: Actions = {
 		}
 
 		try {
-			const result = await auth.login(email, password);
+			const { data: result, setCookie } = await auth.login(email, password);
+
+			// Forward the session cookie from the Go API to the browser.
+			// apiFetch runs server-side; the Go API's Set-Cookie header is
+			// silently discarded by the fetch runtime unless we re-set it here.
+			if (setCookie) {
+				const parts = setCookie.split(';').map((s) => s.trim());
+				const eqIdx = parts[0].indexOf('=');
+				const cookieName = parts[0].slice(0, eqIdx);
+				const cookieValue = parts[0].slice(eqIdx + 1);
+				const maxAgeStr = parts
+					.find((p) => p.toLowerCase().startsWith('max-age='))
+					?.split('=')[1];
+				cookies.set(cookieName, cookieValue, {
+					path: '/',
+					httpOnly: true,
+					secure: true,
+					sameSite: 'strict',
+					...(maxAgeStr ? { maxAge: parseInt(maxAgeStr, 10) } : {})
+				});
+			}
 
 			if (result.mfa_required) {
-				// Redirect to MFA page — the partial JWT is already in the cookie
-				// set by the Go API response (forwarded by SvelteKit).
 				throw redirect(302, '/login/mfa');
 			}
 
