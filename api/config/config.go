@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 // Config holds all environment-based configuration for the API server.
@@ -61,7 +62,7 @@ func Load() (*Config, error) {
 		ClaudeModel:       getEnv("CLAUDE_MODEL", "claude-sonnet-4-5-20250929"),
 		ResendAPIKey:      requireEnv("RESEND_API_KEY"),
 		EmailFromAddr:     getEnv("EMAIL_FROM_ADDR", "noreply@pragmagrading.com"),
-		FrontendOrigin:    requireEnv("FRONTEND_ORIGIN"),
+		FrontendOrigin:    strings.TrimRight(requireEnv("FRONTEND_ORIGIN"), "/"),
 		EncryptionRootKey: requireEnv("ENCRYPTION_ROOT_KEY"),
 		HIBPAPIKey:        getEnv("HIBP_API_KEY", ""),
 	}
