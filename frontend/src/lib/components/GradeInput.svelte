@@ -35,7 +35,8 @@
 
 	function save() {
 		editing = false;
-		const parsed = inputValue.trim() === '' ? null : Number(inputValue);
+		const raw = String(inputValue ?? '').trim();
+		const parsed = raw === '' ? null : Number(raw);
 		if (parsed !== null && (isNaN(parsed) || parsed < 0 || parsed > maxPoints)) {
 			// Revert to previous value.
 			inputValue = value?.toString() ?? '';
