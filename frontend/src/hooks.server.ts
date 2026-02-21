@@ -36,15 +36,15 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const response = await resolve(event);
 
 	// Security headers (spec §7.7).
+	// NOTE: Content-Security-Policy is configured in svelte.config.js via kit.csp
+	// so SvelteKit can inject nonces for its inline hydration scripts. Setting
+	// script-src 'self' here WITHOUT nonces blocks hydration and kills all
+	// client-side interactivity.
 	response.headers.set('X-Frame-Options', 'DENY');
 	response.headers.set('X-Content-Type-Options', 'nosniff');
 	response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
 	response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
 	response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-	response.headers.set(
-		'Content-Security-Policy',
-		"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com"
-	);
 
 	// Request logging.
 	const duration = Date.now() - start;

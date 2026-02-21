@@ -162,8 +162,8 @@ export const grades = {
 	listForCourse: (courseId: string, token: string) =>
 		apiFetch<{ grades: Grade[] }>(`/courses/${courseId}/grades`, { token }),
 
-	upsert: (data: UpsertGradeData, token: string) =>
-		apiFetch<{ grade_id: string }>('/courses//grades', {
+	upsert: (courseId: string, data: UpsertGradeData, token: string) =>
+		apiFetch<{ grade_id: string }>(`/courses/${courseId}/grades`, {
 			method: 'POST',
 			body: JSON.stringify(data),
 			token
@@ -264,6 +264,7 @@ export interface StudentRow {
 	grade_level: string;
 	enrollment_status: string;
 	is_grade_locked: boolean;
+	lock_reason: string | null;
 	enrollment_date: string;
 }
 
