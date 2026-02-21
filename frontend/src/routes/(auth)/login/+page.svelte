@@ -12,17 +12,17 @@
 	<title>Sign in — Pragma</title>
 </svelte:head>
 
-<div class="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-4 py-16 dark:bg-slate-950">
+<div class="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-4 py-16 dark:bg-background">
 	<!-- Brand -->
 	<div class="mb-8 text-center">
 		<span class="text-3xl font-bold tracking-tight text-primary">Pragma</span>
-		<p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Student Grading Platform</p>
+		<p class="mt-1 text-sm text-muted-foreground">Student Grading Platform</p>
 	</div>
 
 	<!-- Card -->
-	<div class="w-full max-w-sm rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
-		<h1 class="mb-1 text-xl font-semibold text-slate-900 dark:text-slate-50">Welcome back</h1>
-		<p class="mb-6 text-sm text-slate-500 dark:text-slate-400">Sign in to your account to continue.</p>
+	<div class="w-full max-w-sm rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-200 dark:bg-card dark:ring-border dark:shadow-lg dark:shadow-black/20">
+		<h1 class="mb-1 text-xl font-semibold text-slate-900 dark:text-foreground">Welcome back</h1>
+		<p class="mb-6 text-sm text-muted-foreground">Sign in to your account to continue.</p>
 
 		{#if data.registered}
 			<div
@@ -56,7 +56,7 @@
 			<div>
 				<label
 					for="email"
-					class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300"
+					class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-muted-foreground"
 				>
 					Email
 				</label>
@@ -68,7 +68,7 @@
 					required
 					value={form?.email ?? ''}
 					placeholder="you@school.edu"
-					class="block w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-[box-shadow,border-color] duration-150 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-50 dark:placeholder-slate-500 dark:focus:border-primary"
+					class="block w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-[box-shadow,border-color] duration-150 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-border dark:bg-secondary dark:text-foreground dark:placeholder-muted-foreground dark:focus:border-primary"
 				/>
 			</div>
 
@@ -76,7 +76,7 @@
 				<div class="mb-1.5 flex items-center justify-between">
 					<label
 						for="password"
-						class="block text-sm font-medium text-slate-700 dark:text-slate-300"
+						class="block text-sm font-medium text-slate-700 dark:text-muted-foreground"
 					>
 						Password
 					</label>
@@ -90,14 +90,14 @@
 					type="password"
 					autocomplete="current-password"
 					required
-					class="block w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 transition-[box-shadow,border-color] duration-150 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-50 dark:focus:border-primary"
+					class="block w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 transition-[box-shadow,border-color] duration-150 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-border dark:bg-secondary dark:text-foreground dark:focus:border-primary"
 				/>
 			</div>
 
 			<button
 				type="submit"
 				disabled={loading}
-				class="mt-1 flex w-full items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity duration-150 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+				class="mt-1 flex w-full items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity duration-150 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-card disabled:cursor-not-allowed disabled:opacity-50"
 			>
 				{#if loading}
 					<svg
@@ -123,7 +123,7 @@
 	</div>
 
 	<!-- Footer -->
-	<p class="mt-6 text-sm text-slate-500 dark:text-slate-400">
+	<p class="mt-6 text-sm text-muted-foreground">
 		No account?
 		<a href="/register" class="font-medium text-primary hover:underline">Create one</a>
 	</p>

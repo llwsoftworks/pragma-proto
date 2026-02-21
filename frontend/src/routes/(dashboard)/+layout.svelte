@@ -71,6 +71,13 @@
 
 	$: themeIcon = $theme === 'dark' ? '☀' : '◐';
 	$: themeLabel = $theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+
+	const toastStyles: Record<string, string> = {
+		success: 'bg-green-50 text-green-800 border-green-200 dark:bg-green-950/60 dark:text-green-300 dark:border-green-800/40',
+		error: 'bg-red-50 text-red-800 border-red-200 dark:bg-red-950/60 dark:text-red-300 dark:border-red-800/40',
+		info: 'bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800/40',
+		warning: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/40'
+	};
 </script>
 
 <div class="flex min-h-screen flex-col">
@@ -177,15 +184,7 @@
 	<div class="fixed bottom-4 right-4 z-50 flex flex-col gap-2" aria-live="polite">
 		{#each $notifications as toast (toast.id)}
 			<div
-				class="flex items-center gap-3 rounded-md px-4 py-3 text-sm shadow-lg"
-				class:bg-green-50={toast.type === 'success'}
-				class:text-green-800={toast.type === 'success'}
-				class:bg-red-50={toast.type === 'error'}
-				class:text-red-800={toast.type === 'error'}
-				class:bg-blue-50={toast.type === 'info'}
-				class:text-blue-800={toast.type === 'info'}
-				class:bg-amber-50={toast.type === 'warning'}
-				class:text-amber-800={toast.type === 'warning'}
+				class="flex items-center gap-3 rounded-md border px-4 py-3 text-sm shadow-lg {toastStyles[toast.type] ?? toastStyles.info}"
 				role="status"
 			>
 				<span>{toast.message}</span>
