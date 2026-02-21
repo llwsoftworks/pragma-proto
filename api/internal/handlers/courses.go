@@ -90,6 +90,29 @@ func (h *CoursesHandler) GetEnrolledStudents(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, http.StatusOK, map[string]interface{}{"students": students})
 }
 
+// GetCourse returns a single course by ID.
+func (h *CoursesHandler) GetCourse(w http.ResponseWriter, r *http.Request) {
+	claims, _ := auth.ClaimsFromContext(r.Context())
+	courseID := chi.URLParam(r, "courseId")
+	ctx := r.Context()
+
+	var c models.Course
+	err := h.db.QueryRow(ctx, `
+		SELECT c.id, c.name, c.subject, c.period, c.room, c.academic_year, c.semester, c.is_active
+		FROM courses c
+		WHERE c.id = $1 AND c.school_id = $2
+	`, courseID, claims.SchoolID).Scan(
+		&c.ID, &c.Name, &c.Subject, &c.Period, &c.Room,
+		&c.AcademicYear, &c.Semester, &c.IsActive,
+	)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "not_found", "course not found")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, c)
+}
+
 // CreateCourse creates a new course (admin only).
 func (h *CoursesHandler) CreateCourse(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.ClaimsFromContext(r.Context())

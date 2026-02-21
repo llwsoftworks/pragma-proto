@@ -12,21 +12,29 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// Parse session cookie.
 	const sessionCookie = event.cookies.get('session');
 	if (sessionCookie) {
-		// Attach raw token to locals so +layout.server.ts files can forward it.
-		event.locals.sessionToken = sessionCookie;
-
 		// Decode the JWT payload (no verification — Go API verifies on every call).
 		try {
 			const parts = sessionCookie.split('.');
 			if (parts.length === 3) {
 				const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-				event.locals.user = {
-					id: payload.uid,
-					schoolId: payload.sid,
-					role: payload.role,
-					email: payload.email,
-					mfaDone: payload.mfa_done
-				};
+
+				// Check expiration: if the token has expired, treat as unauthenticated
+				// so the layout auth guard redirects to /login instead of letting
+				// page loaders call the Go API with a stale token (which returns 401
+				// and surfaces as a 500 to the user).
+				const now = Math.floor(Date.now() / 1000);
+				if (payload.exp && payload.exp < now) {
+					event.cookies.delete('session', { path: '/' });
+				} else {
+					event.locals.sessionToken = sessionCookie;
+					event.locals.user = {
+						id: payload.uid,
+						schoolId: payload.sid,
+						role: payload.role,
+						email: payload.email,
+						mfaDone: payload.mfa_done
+					};
+				}
 			}
 		} catch {
 			// Malformed token — treat as unauthenticated.
