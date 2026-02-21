@@ -1,12 +1,12 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { auth } from '$lib/api';
+import { rolePath } from '$lib/utils';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	// Redirect already-authenticated users to their dashboard.
 	if (locals.user?.mfaDone) {
-		const role = locals.user.role;
-		throw redirect(302, `/${role}`);
+		throw redirect(302, rolePath(locals.user.role));
 	}
 	return { registered: url.searchParams.has('registered') };
 };
@@ -49,8 +49,7 @@ export const actions: Actions = {
 			}
 
 			// Full login success.
-			const role = result.user?.role ?? 'student';
-			throw redirect(302, `/${role}`);
+			throw redirect(302, rolePath(result.user?.role ?? 'student'));
 		} catch (err: unknown) {
 			if (err instanceof Response || (err as { status?: number })?.status === 302) {
 				throw err; // re-throw redirects

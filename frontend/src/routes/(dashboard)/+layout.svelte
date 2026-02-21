@@ -4,6 +4,7 @@
 	import { currentUser } from '$lib/stores/auth';
 	import { theme } from '$lib/stores/theme';
 	import { notifications } from '$lib/stores/notifications';
+	import { rolePath } from '$lib/utils';
 
 	export let data: LayoutData;
 
@@ -90,7 +91,7 @@
 	<!-- Top navigation bar -->
 	<header class="border-b border-border bg-background">
 		<div class="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
-			<a href={data.user.role === 'super_admin' ? '/super-admin' : `/${data.user.role}`} class="shrink-0 text-lg font-bold text-primary">Pragma</a>
+			<a href={rolePath(data.user.role)} class="shrink-0 text-lg font-bold text-primary">Pragma</a>
 
 			<!-- Desktop nav (hidden on mobile) -->
 			<nav class="hidden flex-1 gap-1 md:flex" aria-label="Main navigation">

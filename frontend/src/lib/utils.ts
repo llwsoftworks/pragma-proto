@@ -42,6 +42,11 @@ export function hasRole(role: string | undefined, ...roles: string[]): boolean {
 	return !!role && roles.includes(role);
 }
 
+/** Map a role string to its dashboard path prefix (handles super_admin → super-admin). */
+export function rolePath(role: string): string {
+	return role === 'super_admin' ? '/super-admin' : `/${role}`;
+}
+
 /** Format a decimal percentage for display. */
 export function formatPercent(value: number | null | undefined): string {
 	if (value == null) return '—';
