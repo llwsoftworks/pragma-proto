@@ -8,6 +8,7 @@
 -- │                                                              │
 -- │  School ID:  a1b2c3d4-e5f6-7890-abcd-ef1234567890           │
 -- │                                                              │
+-- │  superadmin@pragma.dev    SuperAdmin1!      (super_admin)   │
 -- │  admin@lincoln.edu        AdminPassword1!   (admin)         │
 -- │  j.smith@lincoln.edu      TeacherPass1!#    (teacher)       │
 -- │  m.jones@lincoln.edu      TeacherPass2!#    (teacher)       │
@@ -54,6 +55,13 @@ INSERT INTO schools (id, name, address, settings) VALUES (
 -- Passwords hashed with Argon2id (m=65536, t=3, p=4) per spec §7.1.
 
 INSERT INTO users (id, school_id, role, email, password_hash, first_name, last_name) VALUES
+
+-- Super Admin
+('00000000-0000-0000-0000-000000000001',
+ 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+ 'super_admin', 'superadmin@pragma.dev',
+ '$argon2id$v=19$m=65536,t=3,p=4$gSLh3SLP5nU6aKypeu5WSA$6nC0VW7mp3rPDXmdZ8eNU4pj2xW65vK7H7rExYZBtdo',
+ 'Super', 'Admin'),
 
 -- Admin
 ('11111111-1111-1111-1111-111111111111',
