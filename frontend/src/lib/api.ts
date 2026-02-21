@@ -188,6 +188,7 @@ export interface UpsertGradeData {
 
 export interface Assignment {
 	id: string;
+	short_id: string;
 	course_id: string;
 	title: string;
 	description: string | null;
@@ -355,6 +356,7 @@ export interface ReportCommentRequest {
 
 export interface Course {
 	id: string;
+	short_id: string;
 	name: string;
 	subject: string;
 	period: string | null;

@@ -25,15 +25,23 @@ func NewGradesHandler(db *pgxpool.Pool, grading *services.GradingService) *Grade
 }
 
 // ListGrades returns all grades for a course (teacher/admin only).
+// courseId URL param is a short_id.
 func (h *GradesHandler) ListGrades(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.ClaimsFromContext(r.Context())
-	courseID := chi.URLParam(r, "courseId")
-	if courseID == "" {
+	courseParam := chi.URLParam(r, "courseId")
+	if courseParam == "" {
 		writeError(w, http.StatusBadRequest, "missing_param", "courseId is required")
 		return
 	}
 
 	ctx := r.Context()
+
+	// Resolve short_id → UUID.
+	courseUUID, err := resolveCourseUUID(ctx, h.db, courseParam, claims.SchoolID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "not_found", "course not found")
+		return
+	}
 
 	// Verify the teacher owns this course (RBAC + ownership check).
 	if claims.Role == models.RoleTeacher {
@@ -42,7 +50,7 @@ func (h *GradesHandler) ListGrades(w http.ResponseWriter, r *http.Request) {
 			SELECT COUNT(*) FROM courses c
 			JOIN teachers t ON t.id = c.teacher_id
 			WHERE c.id = $1 AND t.user_id = $2 AND c.school_id = $3
-		`, courseID, claims.UserID, claims.SchoolID).Scan(&teacherCourseCount)
+		`, courseUUID, claims.UserID, claims.SchoolID).Scan(&teacherCourseCount)
 		if teacherCourseCount == 0 {
 			writeError(w, http.StatusForbidden, "forbidden", "you are not the teacher for this course")
 			return
@@ -59,7 +67,7 @@ func (h *GradesHandler) ListGrades(w http.ResponseWriter, r *http.Request) {
 		JOIN assignments a ON a.id = g.assignment_id
 		WHERE a.course_id = $1 AND g.school_id = $2
 		ORDER BY g.student_id, a.due_date
-	`, courseID, claims.SchoolID)
+	`, courseUUID, claims.SchoolID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "db_error", "failed to fetch grades")
 		return
@@ -86,8 +94,19 @@ func (h *GradesHandler) ListGrades(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpsertGrade creates or updates a single grade entry.
+// courseId URL param is a short_id.
 func (h *GradesHandler) UpsertGrade(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.ClaimsFromContext(r.Context())
+	courseParam := chi.URLParam(r, "courseId")
+	ctx := r.Context()
+
+	// Resolve short_id → UUID.
+	courseUUID, err := resolveCourseUUID(ctx, h.db, courseParam, claims.SchoolID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "not_found", "course not found")
+		return
+	}
+	_ = courseUUID // Used for scoping verification; the grade INSERT uses assignment_id directly.
 
 	var req struct {
 		AssignmentID string   `json:"assignment_id" validate:"required,uuid"`
@@ -111,12 +130,10 @@ func (h *GradesHandler) UpsertGrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx := r.Context()
-
 	// Fetch current grade for audit log old_value.
 	var oldGrade *models.Grade
 	var existing models.Grade
-	err := h.db.QueryRow(ctx, `
+	err = h.db.QueryRow(ctx, `
 		SELECT id, points_earned, letter_grade, comment, is_excused, is_missing, is_late
 		FROM grades WHERE assignment_id = $1 AND student_id = $2 AND school_id = $3
 	`, req.AssignmentID, req.StudentID, claims.SchoolID).Scan(

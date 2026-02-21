@@ -1,12 +1,11 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
-import { grades } from '$lib/api';
-import { decodeId } from '$lib/utils';
 
 const API_BASE = process.env.API_URL ?? 'http://localhost:8080';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
-	const courseId = decodeId(params.courseId);
+	// params.courseId is already the 8-char short_id — pass it directly to the API.
+	const courseId = params.courseId;
 	const token = locals.sessionToken!;
 
 	try {
@@ -44,7 +43,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	} catch (err) {
 		if (err && typeof err === 'object' && 'status' in err) throw err;
 		return {
-			course: { id: courseId, name: 'Unknown Course', subject: '' },
+			course: { id: '', short_id: courseId, name: 'Unknown Course', subject: '' },
 			students: [],
 			assignments: [],
 			grades: []
@@ -63,7 +62,7 @@ export const actions: Actions = {
 		const isLate = data.get('is_late') === 'true';
 
 		const points = pointsRaw === '' ? null : Number(pointsRaw);
-		const courseId = decodeId(params.courseId);
+		const courseId = params.courseId; // short_id — passed directly to API
 
 		try {
 			const token = locals.sessionToken!;
