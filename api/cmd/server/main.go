@@ -221,6 +221,10 @@ func main() {
 		r.Route("/courses/{courseId}/students", func(r chi.Router) {
 			r.Get("/", coursesH.GetEnrolledStudents)
 		})
+		r.Route("/courses/{courseId}/assignments", func(r chi.Router) {
+			r.Use(apimiddleware.RequireRoles("teacher", "admin", "super_admin"))
+			r.Get("/", assignmentsH.ListCourseAssignments)
+		})
 	})
 
 	// Start server.

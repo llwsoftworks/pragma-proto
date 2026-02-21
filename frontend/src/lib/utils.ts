@@ -69,6 +69,42 @@ export const CATEGORY_LABELS: Record<string, string> = {
 	other: 'Other'
 };
 
+/**
+ * Encode a UUID to a URL-safe short ID (22 chars).
+ * Strips dashes, converts hex to bytes, then base64url encodes.
+ * "c3c3c3c3-c3c3-c3c3-c3c3-c3c3c3c3c3c3" → "w8PDw8PDw8PDw8PDw8PDww"
+ */
+export function encodeId(uuid: string): string {
+	const hex = uuid.replace(/-/g, '');
+	const bytes = new Uint8Array(16);
+	for (let i = 0; i < 16; i++) {
+		bytes[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+	}
+	let binary = '';
+	for (const b of bytes) binary += String.fromCharCode(b);
+	return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/**
+ * Decode a short ID back to a UUID string.
+ * "w8PDw8PDw8PDw8PDw8PDww" → "c3c3c3c3-c3c3-c3c3-c3c3-c3c3c3c3c3c3"
+ */
+export function decodeId(shortId: string): string {
+	const padded = shortId.replace(/-/g, '+').replace(/_/g, '/') + '==';
+	const binary = atob(padded);
+	let hex = '';
+	for (let i = 0; i < binary.length; i++) {
+		hex += binary.charCodeAt(i).toString(16).padStart(2, '0');
+	}
+	return [
+		hex.substring(0, 8),
+		hex.substring(8, 12),
+		hex.substring(12, 16),
+		hex.substring(16, 20),
+		hex.substring(20, 32)
+	].join('-');
+}
+
 /** Clamp a number between min and max. */
 export function clamp(value: number, min: number, max: number): number {
 	return Math.min(Math.max(value, min), max);

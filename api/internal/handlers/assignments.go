@@ -178,6 +178,76 @@ func (h *AssignmentsHandler) CreateAssignment(w http.ResponseWriter, r *http.Req
 	writeJSON(w, http.StatusCreated, map[string]interface{}{"assignment_id": assignmentID})
 }
 
+// ListCourseAssignments returns all assignments for a specific course.
+// Teachers see all (published + draft) for courses they own; admins see all.
+func (h *AssignmentsHandler) ListCourseAssignments(w http.ResponseWriter, r *http.Request) {
+	claims, _ := auth.ClaimsFromContext(r.Context())
+	courseID := chi.URLParam(r, "courseId")
+	if courseID == "" {
+		writeError(w, http.StatusBadRequest, "missing_param", "courseId is required")
+		return
+	}
+	ctx := r.Context()
+
+	// Verify teacher owns this course.
+	if claims.Role == models.RoleTeacher {
+		var count int
+		h.db.QueryRow(ctx, `
+			SELECT COUNT(*) FROM courses c
+			JOIN teachers t ON t.id = c.teacher_id
+			WHERE c.id = $1 AND t.user_id = $2 AND c.school_id = $3
+		`, courseID, claims.UserID, claims.SchoolID).Scan(&count)
+		if count == 0 {
+			writeError(w, http.StatusForbidden, "forbidden", "you are not the teacher for this course")
+			return
+		}
+	}
+
+	rows, err := h.db.Query(ctx, `
+		SELECT a.id, a.course_id, a.title, a.description, a.due_date,
+		       a.max_points, a.category, a.weight, a.is_published,
+		       a.created_at, a.updated_at
+		FROM assignments a
+		WHERE a.course_id = $1 AND a.school_id = $2
+		ORDER BY a.due_date DESC NULLS LAST, a.created_at DESC
+	`, courseID, claims.SchoolID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "db_error", err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type assignmentRow struct {
+		ID          uuid.UUID  `json:"id"`
+		CourseID    uuid.UUID  `json:"course_id"`
+		Title       string     `json:"title"`
+		Description *string    `json:"description,omitempty"`
+		DueDate     *time.Time `json:"due_date,omitempty"`
+		MaxPoints   float64    `json:"max_points"`
+		Category    string     `json:"category"`
+		Weight      float64    `json:"weight"`
+		IsPublished bool       `json:"is_published"`
+		CreatedAt   time.Time  `json:"created_at"`
+		UpdatedAt   time.Time  `json:"updated_at"`
+	}
+
+	var assignments []assignmentRow
+	for rows.Next() {
+		var a assignmentRow
+		if err := rows.Scan(
+			&a.ID, &a.CourseID, &a.Title, &a.Description, &a.DueDate,
+			&a.MaxPoints, &a.Category, &a.Weight, &a.IsPublished,
+			&a.CreatedAt, &a.UpdatedAt,
+		); err != nil {
+			writeError(w, http.StatusInternalServerError, "scan_error", err.Error())
+			return
+		}
+		assignments = append(assignments, a)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{"assignments": assignments})
+}
+
 // RequestUploadURL generates a presigned R2 upload URL for a file attachment.
 func (h *AssignmentsHandler) RequestUploadURL(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.ClaimsFromContext(r.Context())
