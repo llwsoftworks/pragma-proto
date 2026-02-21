@@ -9,6 +9,7 @@ import (
 // Course is a class offered by a school.
 type Course struct {
 	ID           uuid.UUID `json:"id" db:"id"`
+	ShortID      string    `json:"short_id" db:"short_id"`
 	SchoolID     uuid.UUID `json:"school_id" db:"school_id"`
 	TeacherID    uuid.UUID `json:"teacher_id" db:"teacher_id"`
 	Name         string    `json:"name" db:"name"`

@@ -21,6 +21,7 @@ const (
 // Assignment represents a graded task in a course.
 type Assignment struct {
 	ID          uuid.UUID  `json:"id" db:"id"`
+	ShortID     string     `json:"short_id" db:"short_id"`
 	CourseID    uuid.UUID  `json:"course_id" db:"course_id"`
 	SchoolID    uuid.UUID  `json:"school_id" db:"school_id"`
 	Title       string     `json:"title" db:"title"`

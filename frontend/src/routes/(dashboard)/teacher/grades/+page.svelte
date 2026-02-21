@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { encodeId } from '$lib/utils';
 	export let data: PageData;
 </script>
 
@@ -12,7 +11,7 @@
 		<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 			{#each data.courses as course (course.id)}
 				<a
-					href="/teacher/grades/{encodeId(course.id)}"
+					href="/teacher/grades/{course.short_id}"
 					class="rounded-lg border border-border bg-card p-4 hover:border-primary hover:bg-card/80 transition-colors"
 				>
 					<div class="font-semibold">{course.name}</div>

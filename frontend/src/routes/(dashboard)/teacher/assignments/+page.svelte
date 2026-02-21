@@ -3,7 +3,7 @@
 	 * Teacher — Assignment list grouped by course (spec §5.1).
 	 */
 	import type { PageData } from './$types';
-	import { formatDate, encodeId } from '$lib/utils';
+	import { formatDate } from '$lib/utils';
 	import type { AssignmentListItem } from '$lib/api';
 
 	export let data: PageData;
@@ -51,7 +51,7 @@
 							<li class="flex items-center gap-4 px-4 py-3 hover:bg-muted/50">
 								<div class="min-w-0 flex-1">
 									<a
-										href="/teacher/assignments/{encodeId(a.id)}"
+										href="/teacher/assignments/{a.short_id}"
 										class="text-sm font-medium hover:underline"
 									>
 										{a.title}
