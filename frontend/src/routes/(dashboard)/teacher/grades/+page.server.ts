@@ -1,5 +1,4 @@
 import type { PageServerLoad } from './$types';
-import { apiFetch } from '$lib/api';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	// Fetch teacher's courses.

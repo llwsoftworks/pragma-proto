@@ -77,6 +77,9 @@
 						<div>
 							<span class="font-medium">{student.last_name}, {student.first_name}</span>
 							<span class="ml-2 text-sm text-muted-foreground">#{student.student_number} · {student.grade_level}</span>
+							{#if student.lock_reason}
+								<div class="mt-0.5 text-xs text-muted-foreground">Reason: {student.lock_reason}</div>
+							{/if}
 						</div>
 						<form method="POST" action="?/unlock" use:enhance>
 							<input type="hidden" name="student_id" value={student.id} />
