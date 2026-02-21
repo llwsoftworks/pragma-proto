@@ -1,11 +1,12 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { grades } from '$lib/api';
+import { decodeId } from '$lib/utils';
 
 const API_BASE = process.env.API_URL ?? 'http://localhost:8080';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
-	const { courseId } = params;
+	const courseId = decodeId(params.courseId);
 	const token = locals.sessionToken!;
 
 	try {
@@ -62,10 +63,11 @@ export const actions: Actions = {
 		const isLate = data.get('is_late') === 'true';
 
 		const points = pointsRaw === '' ? null : Number(pointsRaw);
+		const courseId = decodeId(params.courseId);
 
 		try {
 			const token = locals.sessionToken!;
-			await fetch(`${API_BASE}/courses/${params.courseId}/grades`, {
+			await fetch(`${API_BASE}/courses/${courseId}/grades`, {
 				method: 'POST',
 				headers: {
 					Authorization: `Bearer ${token}`,
