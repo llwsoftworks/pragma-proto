@@ -93,9 +93,8 @@
 	{:else}
 		<button
 			class="min-w-[3rem] rounded-sm px-2 py-1 text-sm font-mono tabular-nums hover:bg-muted focus:bg-muted focus:outline-none disabled:cursor-default"
-			class:text-muted-foreground={value == null && !isExcused && !isMissing}
-			class:text-amber-600={isMissing || isLate}
-			class:text-muted-foreground={isExcused}
+			class:text-muted-foreground={isExcused || (value == null && !isMissing)}
+			class:text-amber-600={!isExcused && (isMissing || isLate)}
 			disabled={readonly}
 			on:click={startEdit}
 			title={percentStr}
