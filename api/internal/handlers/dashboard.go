@@ -32,7 +32,9 @@ func (h *DashboardHandler) GetDashboard(w http.ResponseWriter, r *http.Request) 
 		h.parentDashboard(w, r, claims)
 	case models.RoleStudent:
 		h.studentDashboard(w, r, claims)
-	case models.RoleAdmin, models.RoleSuperAdmin:
+	case models.RoleSuperAdmin:
+		h.superAdminDashboard(w, r, claims)
+	case models.RoleAdmin:
 		h.adminDashboard(w, r, claims)
 	default:
 		writeError(w, http.StatusForbidden, "unknown_role", "")
@@ -206,5 +208,53 @@ func (h *DashboardHandler) adminDashboard(w http.ResponseWriter, r *http.Request
 		"total_students":  totalStudents,
 		"total_teachers":  totalTeachers,
 		"locked_students": lockedStudents,
+	})
+}
+
+func (h *DashboardHandler) superAdminDashboard(w http.ResponseWriter, r *http.Request, claims *auth.Claims) {
+	ctx := r.Context()
+
+	var totalSchools, totalUsers, totalStudents, totalTeachers, totalLockedStudents int
+	h.db.QueryRow(ctx, `SELECT COUNT(*) FROM schools`).Scan(&totalSchools)
+	h.db.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE is_active = TRUE`).Scan(&totalUsers)
+	h.db.QueryRow(ctx, `SELECT COUNT(*) FROM students WHERE enrollment_status = 'active'`).Scan(&totalStudents)
+	h.db.QueryRow(ctx, `SELECT COUNT(*) FROM teachers`).Scan(&totalTeachers)
+	h.db.QueryRow(ctx, `SELECT COUNT(*) FROM students WHERE is_grade_locked = TRUE`).Scan(&totalLockedStudents)
+
+	// Recent audit activity across all schools.
+	type recentAudit struct {
+		Action    string    `json:"action"`
+		UserEmail string    `json:"user_email"`
+		SchoolName string   `json:"school_name"`
+		CreatedAt time.Time `json:"created_at"`
+	}
+
+	auditRows, _ := h.db.Query(ctx, `
+		SELECT al.action, COALESCE(u.email, ''), COALESCE(s.name, ''), al.created_at
+		FROM audit_logs al
+		LEFT JOIN users u ON u.id = al.user_id
+		LEFT JOIN schools s ON s.id = al.school_id
+		ORDER BY al.created_at DESC
+		LIMIT 10
+	`)
+
+	var recentActivity []recentAudit
+	if auditRows != nil {
+		defer auditRows.Close()
+		for auditRows.Next() {
+			var ra recentAudit
+			auditRows.Scan(&ra.Action, &ra.UserEmail, &ra.SchoolName, &ra.CreatedAt)
+			recentActivity = append(recentActivity, ra)
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"role":                  "super_admin",
+		"total_schools":         totalSchools,
+		"total_users":           totalUsers,
+		"total_students":        totalStudents,
+		"total_teachers":        totalTeachers,
+		"total_locked_students": totalLockedStudents,
+		"recent_activity":       recentActivity,
 	})
 }

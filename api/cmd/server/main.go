@@ -83,6 +83,7 @@ func main() {
 	reportsH := handlers.NewReportsHandler(db.Pool, pdfSvc, storageSvc, gradingSvc)
 	coursesH := handlers.NewCoursesHandler(db.Pool)
 	studentsH := handlers.NewStudentsHandler(db.Pool)
+	superAdminH := handlers.NewSuperAdminHandler(db.Pool, emailSvc)
 
 	// Build router.
 	r := chi.NewRouter()
@@ -225,6 +226,32 @@ func main() {
 			r.Use(apimiddleware.RequireRoles("teacher", "admin", "super_admin"))
 			r.Get("/", assignmentsH.ListCourseAssignments)
 		})
+	})
+
+	// Platform routes — super_admin only, no tenant scoping.
+	// These bypass TenantMiddleware because they operate across all schools.
+	r.Group(func(r chi.Router) {
+		r.Use(authMiddleware)
+		r.Use(apimiddleware.RateLimitGeneral)
+		r.Use(apimiddleware.AuditMiddleware(db.Pool))
+		r.Use(apimiddleware.RequireRoles("super_admin"))
+
+		r.Get("/platform/stats", superAdminH.GetPlatformStats)
+
+		// School management.
+		r.Get("/platform/schools", superAdminH.ListSchools)
+		r.Post("/platform/schools", superAdminH.CreateSchool)
+		r.Get("/platform/schools/{schoolId}", superAdminH.GetSchool)
+		r.Put("/platform/schools/{schoolId}", superAdminH.UpdateSchool)
+		r.Delete("/platform/schools/{schoolId}", superAdminH.DeleteSchool)
+
+		// User management (within a school).
+		r.Get("/platform/schools/{schoolId}/users", superAdminH.ListSchoolUsers)
+		r.Post("/platform/schools/{schoolId}/users", superAdminH.CreateSchoolUser)
+		r.Put("/platform/users/{userId}/status", superAdminH.UpdateUserStatus)
+
+		// Platform-wide audit logs.
+		r.Get("/platform/audit-logs", superAdminH.ListPlatformAuditLogs)
 	})
 
 	// Start server.
