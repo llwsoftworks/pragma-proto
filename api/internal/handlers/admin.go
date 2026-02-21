@@ -166,7 +166,7 @@ func (h *AdminHandler) ListStudents(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.db.Query(ctx, `
 		SELECT s.id, u.email, u.first_name, u.last_name,
 		       s.student_number, s.grade_level, s.enrollment_status,
-		       s.is_grade_locked, s.enrollment_date
+		       s.is_grade_locked, s.lock_reason, s.enrollment_date
 		FROM students s
 		JOIN users u ON u.id = s.user_id
 		WHERE s.school_id = $1
@@ -188,6 +188,7 @@ func (h *AdminHandler) ListStudents(w http.ResponseWriter, r *http.Request) {
 		GradeLevel       string    `json:"grade_level"`
 		EnrollmentStatus string    `json:"enrollment_status"`
 		IsGradeLocked    bool      `json:"is_grade_locked"`
+		LockReason       *string   `json:"lock_reason"`
 		EnrollmentDate   time.Time `json:"enrollment_date"`
 	}
 
@@ -197,7 +198,7 @@ func (h *AdminHandler) ListStudents(w http.ResponseWriter, r *http.Request) {
 		if err := rows.Scan(
 			&s.ID, &s.Email, &s.FirstName, &s.LastName,
 			&s.StudentNumber, &s.GradeLevel, &s.EnrollmentStatus,
-			&s.IsGradeLocked, &s.EnrollmentDate,
+			&s.IsGradeLocked, &s.LockReason, &s.EnrollmentDate,
 		); err != nil {
 			continue
 		}

@@ -217,6 +217,7 @@ func main() {
 			r.With(apimiddleware.RequireRoles("admin", "super_admin")).
 				Post("/", coursesH.CreateCourse)
 		})
+		r.Get("/courses/{courseId}", coursesH.GetCourse)
 		r.Route("/courses/{courseId}/students", func(r chi.Router) {
 			r.Get("/", coursesH.GetEnrolledStudents)
 		})
