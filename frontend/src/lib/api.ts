@@ -139,6 +139,11 @@ export interface DashboardData {
 	total_students?: number;
 	total_teachers?: number;
 	locked_students?: number;
+	// Super-admin dashboard fields.
+	total_schools?: number;
+	total_users?: number;
+	total_locked_students?: number;
+	recent_activity?: { action: string; user_email: string; school_name: string; created_at: string }[];
 }
 
 // ---- Grades ----
@@ -415,3 +420,155 @@ export interface ChildSummary {
 	is_grade_locked: boolean;
 	can_view_grades: boolean;
 }
+
+// ---- Super Admin (Platform) ----
+
+export interface PlatformStats {
+	role: 'super_admin';
+	total_schools: number;
+	total_users: number;
+	total_students: number;
+	total_teachers: number;
+	total_locked_students: number;
+	schools: SchoolSummary[];
+}
+
+export interface SchoolSummary {
+	id: string;
+	name: string;
+	user_count: number;
+	student_count: number;
+	teacher_count: number;
+	created_at: string;
+}
+
+export interface SchoolDetail {
+	id: string;
+	name: string;
+	address: string | null;
+	logo_url: string | null;
+	settings: Record<string, unknown>;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface SchoolWithCounts {
+	school: SchoolDetail;
+	total_users: number;
+	total_students: number;
+	total_teachers: number;
+	locked_students: number;
+	total_courses: number;
+}
+
+export interface SchoolListItem {
+	id: string;
+	name: string;
+	address: string | null;
+	logo_url: string | null;
+	settings: Record<string, unknown>;
+	created_at: string;
+	updated_at: string;
+	user_count: number;
+	student_count: number;
+}
+
+export interface PlatformUser {
+	id: string;
+	email: string;
+	role: string;
+	first_name: string;
+	last_name: string;
+	is_active: boolean;
+	mfa_enabled: boolean;
+	last_login_at: string | null;
+	created_at: string;
+}
+
+export interface AuditLogEntry {
+	id: string;
+	school_id: string;
+	school_name: string;
+	user_id: string | null;
+	user_email: string;
+	action: string;
+	entity_type: string;
+	entity_id: string | null;
+	old_value: unknown;
+	new_value: unknown;
+	ip_address: string | null;
+	user_agent: string | null;
+	created_at: string;
+}
+
+export interface CreateSchoolData {
+	name: string;
+	address?: string;
+}
+
+export interface CreateSchoolUserData {
+	role: string;
+	email: string;
+	password: string;
+	first_name: string;
+	last_name: string;
+	phone?: string;
+}
+
+export const platform = {
+	getStats: (token: string) =>
+		apiFetch<PlatformStats>('/platform/stats', { token }),
+
+	listSchools: (token: string) =>
+		apiFetch<{ schools: SchoolListItem[]; total: number }>('/platform/schools', { token }),
+
+	createSchool: (data: CreateSchoolData, token: string) =>
+		apiFetch<{ school_id: string }>('/platform/schools', {
+			method: 'POST',
+			body: JSON.stringify(data),
+			token
+		}),
+
+	getSchool: (schoolId: string, token: string) =>
+		apiFetch<SchoolWithCounts>(`/platform/schools/${schoolId}`, { token }),
+
+	updateSchool: (schoolId: string, data: Partial<CreateSchoolData & { logo_url: string; settings: Record<string, unknown> }>, token: string) =>
+		apiFetch<{ ok: boolean }>(`/platform/schools/${schoolId}`, {
+			method: 'PUT',
+			body: JSON.stringify(data),
+			token
+		}),
+
+	deleteSchool: (schoolId: string, token: string) =>
+		apiFetch<{ ok: boolean; users_deactivated: number }>(`/platform/schools/${schoolId}`, {
+			method: 'DELETE',
+			token
+		}),
+
+	listSchoolUsers: (schoolId: string, token: string, role?: string) => {
+		const params = role ? `?role=${role}` : '';
+		return apiFetch<{ users: PlatformUser[] }>(`/platform/schools/${schoolId}/users${params}`, { token });
+	},
+
+	createSchoolUser: (schoolId: string, data: CreateSchoolUserData, token: string) =>
+		apiFetch<{ user_id: string }>(`/platform/schools/${schoolId}/users`, {
+			method: 'POST',
+			body: JSON.stringify(data),
+			token
+		}),
+
+	updateUserStatus: (userId: string, isActive: boolean, token: string) =>
+		apiFetch<{ ok: boolean }>(`/platform/users/${userId}/status`, {
+			method: 'PUT',
+			body: JSON.stringify({ is_active: isActive }),
+			token
+		}),
+
+	listAuditLogs: (token: string, filters?: { school_id?: string; action?: string }) => {
+		const params = new URLSearchParams();
+		if (filters?.school_id) params.set('school_id', filters.school_id);
+		if (filters?.action) params.set('action', filters.action);
+		const qs = params.toString();
+		return apiFetch<{ audit_logs: AuditLogEntry[] }>(`/platform/audit-logs${qs ? '?' + qs : ''}`, { token });
+	}
+};

@@ -53,8 +53,14 @@
 			{ href: '/admin/settings', label: 'Settings' }
 		],
 		super_admin: [
-			{ href: '/admin', label: 'Dashboard' },
+			{ href: '/super-admin', label: 'Platform' },
+			{ href: '/super-admin/schools', label: 'Schools' },
+			{ href: '/super-admin/audit-logs', label: 'Audit Logs' },
 			{ href: '/admin/students', label: 'Students' },
+			{ href: '/admin/teachers', label: 'Teachers' },
+			{ href: '/admin/courses', label: 'Courses' },
+			{ href: '/admin/grade-locks', label: 'Grade Locks' },
+			{ href: '/admin/reports', label: 'Reports' },
 			{ href: '/admin/settings', label: 'Settings' }
 		]
 	};
@@ -84,7 +90,7 @@
 	<!-- Top navigation bar -->
 	<header class="border-b border-border bg-background">
 		<div class="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
-			<a href="/{data.user.role}" class="shrink-0 text-lg font-bold text-primary">Pragma</a>
+			<a href={data.user.role === 'super_admin' ? '/super-admin' : `/${data.user.role}`} class="shrink-0 text-lg font-bold text-primary">Pragma</a>
 
 			<!-- Desktop nav (hidden on mobile) -->
 			<nav class="hidden flex-1 gap-1 md:flex" aria-label="Main navigation">
