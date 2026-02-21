@@ -351,6 +351,25 @@ export interface ReportCommentRequest {
 	trend_direction: 'improving' | 'declining' | 'stable';
 }
 
+// ---- Courses ----
+
+export interface Course {
+	id: string;
+	name: string;
+	subject: string;
+	period: string | null;
+	room: string | null;
+	academic_year: string;
+	semester: string | null;
+	is_active: boolean;
+	enrollment_count?: number;
+}
+
+export const courses = {
+	mine: (token: string) =>
+		apiFetch<{ courses: Course[] }>('/courses/mine', { token })
+};
+
 // ---- Students ----
 
 export interface MyStudentRecord {
