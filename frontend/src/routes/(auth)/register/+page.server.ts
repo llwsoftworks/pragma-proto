@@ -1,11 +1,12 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { auth } from '$lib/api';
+import { rolePath } from '$lib/utils';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	// Redirect already-authenticated users to their dashboard.
 	if (locals.user?.mfaDone) {
-		throw redirect(302, `/${locals.user.role}`);
+		throw redirect(302, rolePath(locals.user.role));
 	}
 	return {};
 };
