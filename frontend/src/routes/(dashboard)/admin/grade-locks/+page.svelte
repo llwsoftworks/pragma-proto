@@ -21,7 +21,7 @@
 		<div class="mb-4 rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">{form.error}</div>
 	{/if}
 	{#if form?.success}
-		<div class="mb-4 rounded-md bg-green-50 px-4 py-3 text-sm text-green-800">
+		<div class="mb-4 rounded-md bg-green-50 px-4 py-3 text-sm text-green-800 dark:bg-green-950/40 dark:text-green-400">
 			Grade access {form.action} successfully.
 		</div>
 	{/if}
