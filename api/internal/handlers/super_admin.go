@@ -386,14 +386,74 @@ func (h *SuperAdminHandler) ListSchoolUsers(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, map[string]interface{}{"users": users})
 }
 
+// CreateSuperAdmin creates a new super_admin account.
+// Super-admins are not tied to any school (school_id is NULL).
+func (h *SuperAdminHandler) CreateSuperAdmin(w http.ResponseWriter, r *http.Request) {
+	claims, _ := auth.ClaimsFromContext(r.Context())
+
+	var req struct {
+		Email     string `json:"email" validate:"required,email"`
+		Password  string `json:"password" validate:"required,min=12"`
+		FirstName string `json:"first_name" validate:"required,min=1,max=100"`
+		LastName  string `json:"last_name" validate:"required,min=1,max=100"`
+		Phone     string `json:"phone"`
+	}
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	if err := validate.Struct(req); err != nil {
+		writeError(w, http.StatusBadRequest, "validation_error", err.Error())
+		return
+	}
+
+	if err := auth.ValidatePasswordStrength(req.Password); err != nil {
+		writeError(w, http.StatusBadRequest, "weak_password", err.Error())
+		return
+	}
+
+	hash, err := auth.HashPassword(req.Password)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "hash_error", "")
+		return
+	}
+
+	ctx := r.Context()
+	var userID uuid.UUID
+	err = h.db.QueryRow(ctx, `
+		INSERT INTO users (school_id, role, email, password_hash, first_name, last_name, phone)
+		VALUES (NULL, 'super_admin', $1, $2, $3, $4, $5)
+		RETURNING id
+	`, req.Email, hash, req.FirstName, req.LastName, nullStr(req.Phone)).Scan(&userID)
+	if err != nil {
+		writeError(w, http.StatusConflict, "email_exists", "a super-admin with this email already exists")
+		return
+	}
+
+	_ = middleware.WriteAuditLog(ctx, h.db, middleware.AuditEntry{
+		SchoolID:   uuid.Nil,
+		UserID:     &claims.UserID,
+		Action:     "user.create",
+		EntityType: "user",
+		EntityID:   &userID,
+		NewValue:   map[string]string{"email": req.Email, "role": "super_admin"},
+		IPAddress:  r.RemoteAddr,
+		UserAgent:  r.UserAgent(),
+	})
+
+	writeJSON(w, http.StatusCreated, map[string]interface{}{"user_id": userID})
+}
+
 // CreateSchoolUser creates a user within a specific school.
-// This is the only endpoint that can create super_admin users.
+// Cannot create super_admin users — use CreateSuperAdmin for that.
 func (h *SuperAdminHandler) CreateSchoolUser(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.ClaimsFromContext(r.Context())
 	schoolID := chi.URLParam(r, "schoolId")
 
 	var req struct {
-		Role      string `json:"role" validate:"required,oneof=super_admin admin teacher parent student"`
+		Role      string `json:"role" validate:"required,oneof=admin teacher parent student"`
 		Email     string `json:"email" validate:"required,email"`
 		Password  string `json:"password" validate:"required,min=12"`
 		FirstName string `json:"first_name" validate:"required,min=1,max=100"`
@@ -438,8 +498,8 @@ func (h *SuperAdminHandler) CreateSchoolUser(w http.ResponseWriter, r *http.Requ
 	schoolUUID, _ := uuid.Parse(schoolID)
 	if req.Role == models.RoleStudent {
 		h.db.Exec(ctx, `
-			INSERT INTO students (user_id, school_id, student_number, grade_level, enrollment_date)
-			VALUES ($1, $2, $3, $4, NOW())
+			INSERT INTO students (user_id, school_id, student_number, grade_level, enrollment_date, short_id)
+			VALUES ($1, $2, $3, $4, NOW(), left(md5(gen_random_uuid()::text), 8))
 		`, userID, schoolID, "PENDING", "Unassigned")
 	} else if req.Role == models.RoleTeacher {
 		h.db.Exec(ctx, `

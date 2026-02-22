@@ -16,9 +16,10 @@ const (
 )
 
 // User represents a platform user of any role.
+// SchoolID is nullable: super_admin users are not tied to any school.
 type User struct {
 	ID                   uuid.UUID  `json:"id" db:"id"`
-	SchoolID             uuid.UUID  `json:"school_id" db:"school_id"`
+	SchoolID             *uuid.UUID `json:"school_id" db:"school_id"`
 	Role                 string     `json:"role" db:"role"`
 	Email                string     `json:"email" db:"email"`
 	PasswordHash         string     `json:"-" db:"password_hash"`

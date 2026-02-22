@@ -18,13 +18,14 @@ var validate = validator.New()
 
 // AuthHandler handles authentication endpoints.
 type AuthHandler struct {
-	db     *pgxpool.Pool
-	jwtSvc *auth.JWTService
+	db        *pgxpool.Pool
+	jwtSvc    *auth.JWTService
+	encryptor *auth.LoginEncryptor
 }
 
 // NewAuthHandler creates an AuthHandler.
-func NewAuthHandler(db *pgxpool.Pool, jwtSvc *auth.JWTService) *AuthHandler {
-	return &AuthHandler{db: db, jwtSvc: jwtSvc}
+func NewAuthHandler(db *pgxpool.Pool, jwtSvc *auth.JWTService, encryptor *auth.LoginEncryptor) *AuthHandler {
+	return &AuthHandler{db: db, jwtSvc: jwtSvc, encryptor: encryptor}
 }
 
 // loginRequest is validated strictly — unknown fields are rejected.
@@ -33,13 +34,33 @@ type loginRequest struct {
 	Password string `json:"password" validate:"required,min=1"`
 }
 
+// encryptedLoginRequest wraps the AES-256-GCM encrypted login payload.
+type encryptedLoginRequest struct {
+	Encrypted string `json:"encrypted" validate:"required"`
+}
+
 // Login authenticates a user and sets the session cookie.
+// Accepts an AES-256-GCM encrypted payload: {"encrypted": "<base64>"}
+// The encrypted payload decrypts to the standard loginRequest JSON.
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	var req loginRequest
+	var encReq encryptedLoginRequest
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
+	if err := dec.Decode(&encReq); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	// Decrypt the payload.
+	plaintext, err := h.encryptor.Decrypt(encReq.Encrypted)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "decryption_failed", "unable to decrypt login payload")
+		return
+	}
+
+	var req loginRequest
+	if err := json.Unmarshal(plaintext, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "decrypted payload is not valid JSON")
 		return
 	}
 	if err := validate.Struct(req); err != nil {
@@ -98,7 +119,13 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		mfaDone = true // MFA optional for these roles
 	}
 
-	token, err := h.jwtSvc.Issue(user.ID, user.SchoolID, user.Role, user.Email, mfaDone)
+	// Resolve school_id: super_admins have NULL, use zero UUID in JWT.
+	schoolID := uuid.Nil
+	if user.SchoolID != nil {
+		schoolID = *user.SchoolID
+	}
+
+	token, err := h.jwtSvc.Issue(user.ID, schoolID, user.Role, user.Email, mfaDone)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "token_error", "failed to issue token")
 		return
@@ -169,7 +196,12 @@ func (h *AuthHandler) VerifyMFA(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.storeSession(ctx, claims.UserID, claims.SchoolID, token, r)
+	// SchoolID may be nil for super_admins.
+	var schoolIDPtr *uuid.UUID
+	if claims.SchoolID != uuid.Nil {
+		schoolIDPtr = &claims.SchoolID
+	}
+	h.storeSession(ctx, claims.UserID, schoolIDPtr, token, r)
 	setSessionCookie(w, token, claims.Role)
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
@@ -285,7 +317,7 @@ func (h *AuthHandler) recordFailedLogin(ctx context.Context, userID uuid.UUID, a
 		next, lockedUntil, userID)
 }
 
-func (h *AuthHandler) storeSession(ctx context.Context, userID, schoolID uuid.UUID, token string, r *http.Request) {
+func (h *AuthHandler) storeSession(ctx context.Context, userID uuid.UUID, schoolID *uuid.UUID, token string, r *http.Request) {
 	hash := auth.HashToken(token)
 	expiry := time.Now().Add(24 * time.Hour)
 	h.db.Exec(ctx, `

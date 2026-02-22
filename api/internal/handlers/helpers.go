@@ -1,9 +1,13 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // writeJSON encodes v as JSON and writes it with the given status code.
@@ -52,4 +56,34 @@ func parseIntParam(s string, out *int) (int, error) {
 	}
 	*out = n
 	return n, nil
+}
+
+// resolveStudentUUID looks up a student's UUID from its short_id, scoped to a school.
+func resolveStudentUUID(ctx context.Context, db *pgxpool.Pool, shortID string, schoolID uuid.UUID) (uuid.UUID, error) {
+	var id uuid.UUID
+	err := db.QueryRow(ctx,
+		`SELECT id FROM students WHERE short_id = $1 AND school_id = $2`,
+		shortID, schoolID,
+	).Scan(&id)
+	return id, err
+}
+
+// resolveScheduleBlockUUID looks up a schedule block's UUID from its short_id.
+func resolveScheduleBlockUUID(ctx context.Context, db *pgxpool.Pool, shortID string, userID, schoolID uuid.UUID) (uuid.UUID, error) {
+	var id uuid.UUID
+	err := db.QueryRow(ctx,
+		`SELECT id FROM schedule_blocks WHERE short_id = $1 AND user_id = $2 AND school_id = $3`,
+		shortID, userID, schoolID,
+	).Scan(&id)
+	return id, err
+}
+
+// resolveDigitalIDUUID looks up a digital ID's UUID from its short_id.
+func resolveDigitalIDUUID(ctx context.Context, db *pgxpool.Pool, shortID string, schoolID uuid.UUID) (uuid.UUID, error) {
+	var id uuid.UUID
+	err := db.QueryRow(ctx,
+		`SELECT id FROM digital_ids WHERE short_id = $1 AND school_id = $2`,
+		shortID, schoolID,
+	).Scan(&id)
+	return id, err
 }

@@ -8,7 +8,8 @@ import (
 
 // ScheduleBlock is a time slot in a user's weekly schedule.
 type ScheduleBlock struct {
-	ID          uuid.UUID  `json:"id" db:"id"`
+	ID          uuid.UUID  `json:"-" db:"id"`
+	ShortID     string     `json:"id" db:"short_id"`
 	SchoolID    uuid.UUID  `json:"school_id" db:"school_id"`
 	UserID      uuid.UUID  `json:"user_id" db:"user_id"`
 	CourseID    *uuid.UUID `json:"course_id,omitempty" db:"course_id"`

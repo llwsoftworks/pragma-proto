@@ -204,17 +204,25 @@ func (h *GradesHandler) UpsertGrade(w http.ResponseWriter, r *http.Request) {
 
 // GetStudentGrades returns a student's grades for their own courses.
 // Checks grade lock for student/parent roles.
+// studentId URL param is a short_id.
 func (h *GradesHandler) GetStudentGrades(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.ClaimsFromContext(r.Context())
-	studentIDStr := chi.URLParam(r, "studentId")
+	studentParam := chi.URLParam(r, "studentId")
 
 	ctx := r.Context()
+
+	// Resolve student short_id → UUID.
+	studentUUID, err := resolveStudentUUID(ctx, h.db, studentParam, claims.SchoolID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "not_found", "student not found")
+		return
+	}
 
 	// For student role, enforce they can only see their own grades.
 	if claims.Role == models.RoleStudent {
 		var studentUserID uuid.UUID
 		h.db.QueryRow(ctx, `SELECT user_id FROM students WHERE id = $1 AND school_id = $2`,
-			studentIDStr, claims.SchoolID).Scan(&studentUserID)
+			studentUUID, claims.SchoolID).Scan(&studentUserID)
 		if studentUserID != claims.UserID {
 			writeError(w, http.StatusForbidden, "forbidden", "you can only view your own grades")
 			return
@@ -226,7 +234,7 @@ func (h *GradesHandler) GetStudentGrades(w http.ResponseWriter, r *http.Request)
 		var isLocked bool
 		h.db.QueryRow(ctx, `
 			SELECT is_grade_locked FROM students WHERE id = $1 AND school_id = $2
-		`, studentIDStr, claims.SchoolID).Scan(&isLocked)
+		`, studentUUID, claims.SchoolID).Scan(&isLocked)
 		if isLocked {
 			writeError(w, http.StatusForbidden, "grade_locked",
 				"Your grade access has been temporarily restricted. Please contact your school administration.")
@@ -245,7 +253,7 @@ func (h *GradesHandler) GetStudentGrades(w http.ResponseWriter, r *http.Request)
 		WHERE g.student_id = $1 AND g.school_id = $2
 		  AND a.is_published = TRUE
 		ORDER BY c.name, a.due_date
-	`, studentIDStr, claims.SchoolID)
+	`, studentUUID, claims.SchoolID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "db_error", err.Error())
 		return

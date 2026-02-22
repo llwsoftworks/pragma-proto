@@ -25,9 +25,10 @@ func NewAdminHandler(db *pgxpool.Pool, email *services.EmailService) *AdminHandl
 }
 
 // LockGrade locks a single student's grade access.
+// studentId URL param is a short_id.
 func (h *AdminHandler) LockGrade(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.ClaimsFromContext(r.Context())
-	studentID := chi.URLParam(r, "studentId")
+	studentParam := chi.URLParam(r, "studentId")
 
 	var req struct {
 		Reason string `json:"reason" validate:"required,min=1,max=500"`
@@ -45,13 +46,20 @@ func (h *AdminHandler) LockGrade(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
+	// Resolve student short_id → UUID.
+	studentUUID, err := resolveStudentUUID(ctx, h.db, studentParam, claims.SchoolID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "not_found", "student not found")
+		return
+	}
+
 	// Insert grade lock record.
 	var lockID uuid.UUID
-	err := h.db.QueryRow(ctx, `
+	err = h.db.QueryRow(ctx, `
 		INSERT INTO grade_locks (student_id, school_id, locked_by, reason)
 		VALUES ($1, $2, $3, $4)
 		RETURNING id
-	`, studentID, claims.SchoolID, claims.UserID, req.Reason).Scan(&lockID)
+	`, studentUUID, claims.SchoolID, claims.UserID, req.Reason).Scan(&lockID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "db_error", err.Error())
 		return
@@ -59,61 +67,77 @@ func (h *AdminHandler) LockGrade(w http.ResponseWriter, r *http.Request) {
 
 	// Update the student record.
 	h.db.Exec(ctx, `UPDATE students SET is_grade_locked = TRUE, lock_reason = $1 WHERE id = $2 AND school_id = $3`,
-		req.Reason, studentID, claims.SchoolID)
+		req.Reason, studentUUID, claims.SchoolID)
 
 	// Audit log.
-	studentUUID, _ := uuid.Parse(studentID)
 	_ = middleware.WriteAuditLog(ctx, h.db, middleware.AuditEntry{
 		SchoolID:   claims.SchoolID,
 		UserID:     &claims.UserID,
 		Action:     "grade_lock.create",
 		EntityType: "grade_lock",
 		EntityID:   &lockID,
-		NewValue:   map[string]string{"student_id": studentID, "reason": req.Reason},
+		NewValue:   map[string]string{"student_id": studentUUID.String(), "reason": req.Reason},
 		IPAddress:  r.RemoteAddr,
 		UserAgent:  r.UserAgent(),
 	})
-	_ = studentUUID
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{"lock_id": lockID})
 }
 
 // UnlockGrade removes a student's grade lock and notifies them via email.
+// The grade_lock row is deleted rather than soft-updated because audit_logs
+// already captures the full lock/unlock history. Keeping inactive rows is
+// unnecessary bloat.
 func (h *AdminHandler) UnlockGrade(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.ClaimsFromContext(r.Context())
-	studentID := chi.URLParam(r, "studentId")
+	studentParam := chi.URLParam(r, "studentId")
 
 	ctx := r.Context()
 
-	// Deactivate the active lock.
+	// Resolve student short_id → UUID.
+	studentUUID, err := resolveStudentUUID(ctx, h.db, studentParam, claims.SchoolID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "not_found", "student not found")
+		return
+	}
+
+	// Capture lock details for the audit log before deletion.
 	var lockID uuid.UUID
-	err := h.db.QueryRow(ctx, `
-		UPDATE grade_locks SET is_active = FALSE, unlocked_at = NOW(), unlocked_by = $1
-		WHERE student_id = $2 AND school_id = $3 AND is_active = TRUE
-		RETURNING id
-	`, claims.UserID, studentID, claims.SchoolID).Scan(&lockID)
+	var lockReason string
+	err = h.db.QueryRow(ctx, `
+		SELECT id, reason FROM grade_locks
+		WHERE student_id = $1 AND school_id = $2
+	`, studentUUID, claims.SchoolID).Scan(&lockID, &lockReason)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "not_found", "no active lock found for this student")
 		return
 	}
 
+	// Delete the lock row — audit_logs preserves the history.
+	_, err = h.db.Exec(ctx, `DELETE FROM grade_locks WHERE id = $1`, lockID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "db_error", err.Error())
+		return
+	}
+
 	// Update student record.
 	h.db.Exec(ctx, `UPDATE students SET is_grade_locked = FALSE, lock_reason = NULL WHERE id = $1 AND school_id = $2`,
-		studentID, claims.SchoolID)
+		studentUUID, claims.SchoolID)
 
-	// Audit log.
+	// Audit log records who unlocked, when, and the original reason.
 	_ = middleware.WriteAuditLog(ctx, h.db, middleware.AuditEntry{
 		SchoolID:   claims.SchoolID,
 		UserID:     &claims.UserID,
 		Action:     "grade_lock.release",
 		EntityType: "grade_lock",
 		EntityID:   &lockID,
+		OldValue:   map[string]string{"student_id": studentUUID.String(), "reason": lockReason},
 		IPAddress:  r.RemoteAddr,
 		UserAgent:  r.UserAgent(),
 	})
 
 	// Send email notification to student and linked parents.
-	go h.sendUnlockNotifications(ctx, studentID, claims.SchoolID.String())
+	go h.sendUnlockNotifications(ctx, studentUUID.String(), claims.SchoolID.String())
 
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
@@ -164,7 +188,7 @@ func (h *AdminHandler) ListStudents(w http.ResponseWriter, r *http.Request) {
 	limit, offset := paginate(r)
 
 	rows, err := h.db.Query(ctx, `
-		SELECT s.id, u.email, u.first_name, u.last_name,
+		SELECT s.short_id, u.email, u.first_name, u.last_name,
 		       s.student_number, s.grade_level, s.enrollment_status,
 		       s.is_grade_locked, s.lock_reason, s.enrollment_date
 		FROM students s
@@ -180,7 +204,7 @@ func (h *AdminHandler) ListStudents(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	type studentRow struct {
-		ID               uuid.UUID `json:"id"`
+		ID               string    `json:"id"`
 		Email            string    `json:"email"`
 		FirstName        string    `json:"first_name"`
 		LastName         string    `json:"last_name"`

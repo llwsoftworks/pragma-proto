@@ -70,8 +70,14 @@ func main() {
 	// Verification service (school secret = encryption root key).
 	verificationSvc := services.NewVerificationService(cfg.EncryptionRootKey)
 
+	// Init login encryption.
+	loginEncryptor, err := auth.NewLoginEncryptor(cfg.LoginEncryptionKey)
+	if err != nil {
+		log.Fatalf("login encryption: %v", err)
+	}
+
 	// Init handlers.
-	authH := handlers.NewAuthHandler(db.Pool, jwtSvc)
+	authH := handlers.NewAuthHandler(db.Pool, jwtSvc, loginEncryptor)
 	gradesH := handlers.NewGradesHandler(db.Pool, gradingSvc)
 	assignmentsH := handlers.NewAssignmentsHandler(db.Pool, storageSvc)
 	adminH := handlers.NewAdminHandler(db.Pool, emailSvc)
@@ -244,6 +250,9 @@ func main() {
 		r.Get("/platform/schools/{schoolId}", superAdminH.GetSchool)
 		r.Put("/platform/schools/{schoolId}", superAdminH.UpdateSchool)
 		r.Delete("/platform/schools/{schoolId}", superAdminH.DeleteSchool)
+
+		// Super-admin account creation.
+		r.Post("/platform/super-admins", superAdminH.CreateSuperAdmin)
 
 		// User management (within a school).
 		r.Get("/platform/schools/{schoolId}/users", superAdminH.ListSchoolUsers)
