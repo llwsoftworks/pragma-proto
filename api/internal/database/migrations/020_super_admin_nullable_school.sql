@@ -10,8 +10,8 @@ ALTER TABLE users ALTER COLUMN school_id DROP NOT NULL;
 --    NULLs as distinct in unique indexes).  Replace it with a partial unique
 --    index for school-bound users, plus a unique index on email alone for
 --    super_admins (who have school_id IS NULL).
-DROP INDEX IF EXISTS users_school_id_email_key;
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_school_id_email_key;
+DROP INDEX IF EXISTS users_school_id_email_key;
 
 CREATE UNIQUE INDEX idx_users_school_email
     ON users(school_id, email) WHERE school_id IS NOT NULL;
