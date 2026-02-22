@@ -75,7 +75,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// For simplicity, this prototype looks up by email only — in production the login page
 	// would include a school selector that resolves to school_id.
 	var user models.User
-	err := h.db.QueryRow(ctx, `
+	err = h.db.QueryRow(ctx, `
 		SELECT id, school_id, role, email, password_hash, first_name, last_name,
 		       mfa_enabled, is_active, failed_login_attempts, locked_until
 		FROM users WHERE email = $1 LIMIT 1
