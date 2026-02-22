@@ -242,17 +242,25 @@ func (h *ReportsHandler) BatchGenerateReports(w http.ResponseWriter, r *http.Req
 }
 
 // ListReportCards returns a student's report card history.
+// studentId URL param is a short_id.
 func (h *ReportsHandler) ListReportCards(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.ClaimsFromContext(r.Context())
-	studentID := chi.URLParam(r, "studentId")
+	studentParam := chi.URLParam(r, "studentId")
 	ctx := r.Context()
+
+	// Resolve student short_id → UUID.
+	studentUUID, err := resolveStudentUUID(ctx, h.db, studentParam, claims.SchoolID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "not_found", "student not found")
+		return
+	}
 
 	rows, err := h.db.Query(ctx, `
 		SELECT id, academic_period, gpa, is_finalized, pdf_url, generated_at
 		FROM report_cards
 		WHERE student_id = $1 AND school_id = $2
 		ORDER BY generated_at DESC
-	`, studentID, claims.SchoolID)
+	`, studentUUID, claims.SchoolID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "db_error", err.Error())
 		return

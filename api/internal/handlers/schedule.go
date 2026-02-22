@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pragma-proto/api/internal/auth"
 	"github.com/pragma-proto/api/internal/models"
@@ -27,7 +26,7 @@ func (h *ScheduleHandler) ListSchedule(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	rows, err := h.db.Query(ctx, `
-		SELECT sb.id, sb.course_id, COALESCE(c.name, '') AS course_name,
+		SELECT sb.short_id, sb.course_id, COALESCE(c.name, '') AS course_name,
 		       sb.day_of_week, sb.start_time::text, sb.end_time::text,
 		       sb.room, sb.label, sb.color, sb.is_recurring, sb.semester
 		FROM schedule_blocks sb
@@ -45,7 +44,7 @@ func (h *ScheduleHandler) ListSchedule(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var b models.ScheduleBlock
 		if err := rows.Scan(
-			&b.ID, &b.CourseID, &b.CourseName,
+			&b.ShortID, &b.CourseID, &b.CourseName,
 			&b.DayOfWeek, &b.StartTime, &b.EndTime,
 			&b.Room, &b.Label, &b.Color, &b.IsRecurring, &b.Semester,
 		); err != nil {
@@ -98,35 +97,45 @@ func (h *ScheduleHandler) CreateScheduleBlock(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	var blockID uuid.UUID
+	var blockShortID string
 	err := h.db.QueryRow(ctx, `
 		INSERT INTO schedule_blocks
 			(school_id, user_id, course_id, day_of_week, start_time, end_time,
-			 room, label, color, semester, is_recurring)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-		RETURNING id
+			 room, label, color, semester, is_recurring,
+			 short_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+			    left(md5(gen_random_uuid()::text), 8))
+		RETURNING short_id
 	`, claims.SchoolID, claims.UserID, req.CourseID,
 		req.DayOfWeek, req.StartTime, req.EndTime,
 		nullStr(req.Room), nullStr(req.Label), nullStr(req.Color),
 		nullStr(req.Semester), req.IsRecurring,
-	).Scan(&blockID)
+	).Scan(&blockShortID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "db_error", err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, map[string]interface{}{"block_id": blockID})
+	writeJSON(w, http.StatusCreated, map[string]interface{}{"block_id": blockShortID})
 }
 
 // DeleteScheduleBlock removes a schedule block.
+// blockId URL param is a short_id.
 func (h *ScheduleHandler) DeleteScheduleBlock(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.ClaimsFromContext(r.Context())
-	blockID := chi.URLParam(r, "blockId")
+	blockParam := chi.URLParam(r, "blockId")
 	ctx := r.Context()
 
-	_, err := h.db.Exec(ctx, `
+	// Resolve schedule block short_id → UUID.
+	blockUUID, err := resolveScheduleBlockUUID(ctx, h.db, blockParam, claims.UserID, claims.SchoolID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "not_found", "block not found or not owned by you")
+		return
+	}
+
+	_, err = h.db.Exec(ctx, `
 		DELETE FROM schedule_blocks WHERE id = $1 AND user_id = $2 AND school_id = $3
-	`, blockID, claims.UserID, claims.SchoolID)
+	`, blockUUID, claims.UserID, claims.SchoolID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "not_found", "block not found or not owned by you")
 		return

@@ -82,15 +82,20 @@ export interface User {
 	role: string;
 	first_name: string;
 	last_name: string;
-	school_id: string;
+	school_id: string | null;
 }
 
 export const auth = {
-	// Returns setCookie so +page.server.ts can forward it to the browser.
-	login: (email: string, password: string) =>
+	/**
+	 * Log in with an encrypted payload.
+	 * The caller (page.server.ts) encrypts {email, password} with AES-256-GCM
+	 * via server/crypto.ts before passing the base64 ciphertext here.
+	 * Credentials are never sent as plaintext JSON.
+	 */
+	login: (encryptedPayload: string) =>
 		apiFetchRaw<LoginResponse>('/auth/login', {
 			method: 'POST',
-			body: JSON.stringify({ email, password })
+			body: JSON.stringify({ encrypted: encryptedPayload })
 		}),
 
 	// Returns setCookie for the upgraded MFA-complete session token.
@@ -515,9 +520,24 @@ export interface CreateSchoolUserData {
 	phone?: string;
 }
 
+export interface CreateSuperAdminData {
+	email: string;
+	password: string;
+	first_name: string;
+	last_name: string;
+	phone?: string;
+}
+
 export const platform = {
 	getStats: (token: string) =>
 		apiFetch<PlatformStats>('/platform/stats', { token }),
+
+	createSuperAdmin: (data: CreateSuperAdminData, token: string) =>
+		apiFetch<{ user_id: string }>('/platform/super-admins', {
+			method: 'POST',
+			body: JSON.stringify(data),
+			token
+		}),
 
 	listSchools: (token: string) =>
 		apiFetch<{ schools: SchoolListItem[]; total: number }>('/platform/schools', { token }),

@@ -42,6 +42,10 @@ type Config struct {
 
 	// HIBP (Have I Been Pwned) API
 	HIBPAPIKey string
+
+	// Login payload encryption key (base64-encoded 32-byte key for AES-256-GCM).
+	// Shared between SvelteKit and Go API to encrypt credentials in transit.
+	LoginEncryptionKey string
 }
 
 // Load reads configuration from environment variables.
@@ -65,6 +69,7 @@ func Load() (*Config, error) {
 		FrontendOrigin:    strings.TrimRight(requireEnv("FRONTEND_ORIGIN"), "/"),
 		EncryptionRootKey: requireEnv("ENCRYPTION_ROOT_KEY"),
 		HIBPAPIKey:        getEnv("HIBP_API_KEY", ""),
+		LoginEncryptionKey: requireEnv("LOGIN_ENCRYPTION_KEY"),
 	}
 	return cfg, nil
 }

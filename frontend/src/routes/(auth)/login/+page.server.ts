@@ -1,6 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { auth } from '$lib/api';
+import { encryptLoginPayload } from '$lib/server/crypto';
 import { rolePath } from '$lib/utils';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
@@ -22,7 +23,9 @@ export const actions: Actions = {
 		}
 
 		try {
-			const { data: result, setCookie } = await auth.login(email, password);
+			// Encrypt credentials before sending to the Go API.
+			const encrypted = encryptLoginPayload(JSON.stringify({ email, password }));
+			const { data: result, setCookie } = await auth.login(encrypted);
 
 			// Forward the session cookie from the Go API to the browser.
 			// apiFetch runs server-side; the Go API's Set-Cookie header is

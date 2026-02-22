@@ -138,9 +138,9 @@ func (h *DashboardHandler) teacherDashboard(w http.ResponseWriter, r *http.Reque
 func (h *DashboardHandler) parentDashboard(w http.ResponseWriter, r *http.Request, claims *auth.Claims) {
 	ctx := r.Context()
 
-	// Get linked children.
+	// Get linked children — return short_id for URL-friendly references.
 	rows, _ := h.db.Query(ctx, `
-		SELECT s.id, u.first_name, u.last_name, s.grade_level, s.is_grade_locked,
+		SELECT s.short_id, u.first_name, u.last_name, s.grade_level, s.is_grade_locked,
 		       ps.can_view_grades
 		FROM parent_students ps
 		JOIN students s ON s.id = ps.student_id
@@ -149,12 +149,12 @@ func (h *DashboardHandler) parentDashboard(w http.ResponseWriter, r *http.Reques
 	`, claims.UserID, claims.SchoolID)
 
 	type childSummary struct {
-		StudentID     uuid.UUID `json:"student_id"`
-		FirstName     string    `json:"first_name"`
-		LastName      string    `json:"last_name"`
-		GradeLevel    string    `json:"grade_level"`
-		IsGradeLocked bool      `json:"is_grade_locked"`
-		CanViewGrades bool      `json:"can_view_grades"`
+		StudentID     string `json:"student_id"`
+		FirstName     string `json:"first_name"`
+		LastName      string `json:"last_name"`
+		GradeLevel    string `json:"grade_level"`
+		IsGradeLocked bool   `json:"is_grade_locked"`
+		CanViewGrades bool   `json:"can_view_grades"`
 	}
 
 	var children []childSummary
@@ -176,15 +176,15 @@ func (h *DashboardHandler) parentDashboard(w http.ResponseWriter, r *http.Reques
 func (h *DashboardHandler) studentDashboard(w http.ResponseWriter, r *http.Request, claims *auth.Claims) {
 	ctx := r.Context()
 
-	// Get the student record.
-	var studentID uuid.UUID
+	// Get the student record — return short_id for URL-friendly references.
+	var studentShortID string
 	var isLocked bool
-	h.db.QueryRow(ctx, `SELECT id, is_grade_locked FROM students WHERE user_id = $1 AND school_id = $2`,
-		claims.UserID, claims.SchoolID).Scan(&studentID, &isLocked)
+	h.db.QueryRow(ctx, `SELECT short_id, is_grade_locked FROM students WHERE user_id = $1 AND school_id = $2`,
+		claims.UserID, claims.SchoolID).Scan(&studentShortID, &isLocked)
 
 	response := map[string]interface{}{
 		"role":           "student",
-		"student_id":     studentID,
+		"student_id":     studentShortID,
 		"is_grade_locked": isLocked,
 	}
 

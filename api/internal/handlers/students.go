@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pragma-proto/api/internal/auth"
 )
@@ -26,7 +25,7 @@ func (h *StudentsHandler) GetMyRecord(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var s struct {
-		ID               uuid.UUID `json:"id"`
+		ID               string    `json:"id"`
 		StudentNumber    string    `json:"student_number"`
 		GradeLevel       string    `json:"grade_level"`
 		EnrollmentStatus string    `json:"enrollment_status"`
@@ -35,7 +34,7 @@ func (h *StudentsHandler) GetMyRecord(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err := h.db.QueryRow(ctx, `
-		SELECT id, student_number, grade_level, enrollment_status, is_grade_locked, enrollment_date
+		SELECT short_id, student_number, grade_level, enrollment_status, is_grade_locked, enrollment_date
 		FROM students
 		WHERE user_id = $1 AND school_id = $2
 	`, claims.UserID, claims.SchoolID).Scan(

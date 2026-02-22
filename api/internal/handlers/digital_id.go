@@ -33,16 +33,24 @@ func NewDigitalIDHandler(db *pgxpool.Pool, storage *services.StorageService,
 }
 
 // GetStudentID returns the digital ID card for a student.
+// studentId URL param is a short_id.
 func (h *DigitalIDHandler) GetStudentID(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.ClaimsFromContext(r.Context())
-	studentIDStr := chi.URLParam(r, "studentId")
+	studentParam := chi.URLParam(r, "studentId")
 	ctx := r.Context()
+
+	// Resolve student short_id → UUID.
+	studentUUID, err := resolveStudentUUID(ctx, h.db, studentParam, claims.SchoolID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "not_found", "student not found")
+		return
+	}
 
 	// Students can only view their own ID.
 	if claims.Role == "student" {
 		var studentUserID uuid.UUID
 		h.db.QueryRow(ctx, `SELECT user_id FROM students WHERE id = $1 AND school_id = $2`,
-			studentIDStr, claims.SchoolID).Scan(&studentUserID)
+			studentUUID, claims.SchoolID).Scan(&studentUserID)
 		if studentUserID != claims.UserID {
 			writeError(w, http.StatusForbidden, "forbidden", "you can only view your own ID")
 			return
@@ -66,7 +74,7 @@ func (h *DigitalIDHandler) GetStudentID(w http.ResponseWriter, r *http.Request) 
 		SchoolLogo  *string    `json:"school_logo_url"`
 	}
 
-	err := h.db.QueryRow(ctx, `
+	err = h.db.QueryRow(ctx, `
 		SELECT di.id, di.student_id, di.id_number, di.qr_code_data, di.barcode_data,
 		       di.photo_url, di.issued_at, di.expires_at, di.is_valid,
 		       u.first_name, u.last_name, s.grade_level, sch.name, sch.logo_url
@@ -77,7 +85,7 @@ func (h *DigitalIDHandler) GetStudentID(w http.ResponseWriter, r *http.Request) 
 		WHERE di.student_id = $1 AND di.school_id = $2 AND di.is_valid = TRUE
 		ORDER BY di.issued_at DESC
 		LIMIT 1
-	`, studentIDStr, claims.SchoolID).Scan(
+	`, studentUUID, claims.SchoolID).Scan(
 		&id.ID, &id.StudentID, &id.IDNumber, &id.QRCodeData, &id.BarcodeData,
 		&id.PhotoURL, &id.IssuedAt, &id.ExpiresAt, &id.IsValid,
 		&id.FirstName, &id.LastName, &id.GradeLevel, &id.SchoolName, &id.SchoolLogo,
@@ -91,14 +99,16 @@ func (h *DigitalIDHandler) GetStudentID(w http.ResponseWriter, r *http.Request) 
 }
 
 // IssueStudentID generates a new digital ID for a student.
+// studentId URL param is a short_id.
 func (h *DigitalIDHandler) IssueStudentID(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.ClaimsFromContext(r.Context())
-	studentIDStr := chi.URLParam(r, "studentId")
+	studentParam := chi.URLParam(r, "studentId")
 	ctx := r.Context()
 
-	studentID, err := uuid.Parse(studentIDStr)
+	// Resolve student short_id → UUID.
+	studentID, err := resolveStudentUUID(ctx, h.db, studentParam, claims.SchoolID)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_student_id", "")
+		writeError(w, http.StatusNotFound, "not_found", "student not found")
 		return
 	}
 
@@ -156,17 +166,25 @@ func (h *DigitalIDHandler) IssueStudentID(w http.ResponseWriter, r *http.Request
 }
 
 // RevokeStudentID revokes a digital ID (admin only).
+// idId URL param is a short_id.
 func (h *DigitalIDHandler) RevokeStudentID(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.ClaimsFromContext(r.Context())
-	idIDStr := chi.URLParam(r, "idId")
+	idParam := chi.URLParam(r, "idId")
 	ctx := r.Context()
 
+	// Resolve digital ID short_id → UUID.
+	digitalIDUUID, err := resolveDigitalIDUUID(ctx, h.db, idParam, claims.SchoolID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "not_found", "ID not found or already revoked")
+		return
+	}
+
 	var idID uuid.UUID
-	err := h.db.QueryRow(ctx, `
+	err = h.db.QueryRow(ctx, `
 		UPDATE digital_ids SET is_valid = FALSE, revoked_at = NOW()
 		WHERE id = $1 AND school_id = $2 AND is_valid = TRUE
 		RETURNING id
-	`, idIDStr, claims.SchoolID).Scan(&idID)
+	`, digitalIDUUID, claims.SchoolID).Scan(&idID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "not_found", "ID not found or already revoked")
 		return
